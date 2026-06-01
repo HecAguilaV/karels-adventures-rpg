@@ -5,15 +5,14 @@ import textwrap
 import shutil
 import time
 import sys
-try:
-    # Stanford's Code in Place real AI (GPT-powered, available in their IDE)
-    from ai import call_gpt
-except ImportError:
-    # Fallback: our built-in 15-chapter campaign (offline/local)
-    from _campaign import call_gpt
+from _campaign import call_gpt
+
+USING_REAL_AI = False
+AI_PROVIDER = "Campaign"
+CLIENT = None
 
 # ANSI color definitions for the console
-COLOR_NARRATIVE = "\033[94m"
+COLOR_NARRATIVE = "\033[96m"
 COLOR_DAMAGE = "\033[91m"
 COLOR_STATUS = "\033[93m"
 COLOR_MENU = "\033[95m"
@@ -409,10 +408,11 @@ def process_response(response, lang):
             text = text[:-3].strip()
             
     # Additional cleanup specifically for json block formats
-    if text.startswith("```json"):
-        text = text[7:].strip()
-        if text.endswith("```"):
-            text = text[:-3].strip()
+    # Extract JSON object boundaries if text has extra characters
+    start_idx = text.find("{")
+    end_idx = text.rfind("}")
+    if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
+        text = text[start_idx:end_idx + 1]
             
     try:
         data = json.loads(text)
@@ -439,53 +439,30 @@ def process_response(response, lang):
             
         return data
     except Exception as e:
-        # Default dictionary fallback in case of parsing failures
-        if lang == "en":
-            return {
-                "narrativa": "A strange temporal distortion occurs. You keep moving forward.",
-                "opciones": ["Go forward", "Explore the area"],
-                "cambio_vida": 0,
-                "item_encontrado": None
-            }
-        else:
-            return {
-                "narrativa": "Una extraña distorsion en el espacio-tiempo ocurre. Sigues tu camino.",
-                "opciones": ["Continuar adelante", "Explorar el entorno"],
-                "cambio_vida": 0,
-                "item_encontrado": None
-            }
+        # Propagate the parsing exception to trigger main loop fallbacks
+        raise e
 
-def select_story_file(lang):
-    # Pre-condition - lang is a string representing the selected language
-    # Post-condition - returns a tuple with story data dictionary and story name string
-    # Always loads the Karel the Robot campaign story without user menu.
-    
-    # Search for engineer_story.json in standard locations
-    posibles_rutas = [".", "data"]
-    for ruta in posibles_rutas:
-        ruta_completa = os.path.join(ruta, "engineer_story.json")
-        if os.path.exists(ruta_completa):
-            try:
-                with open(ruta_completa, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    return data, "engineer_story"
-            except Exception:
-                pass
-    
-    # Fallback if the file cannot be found or loaded
-    return {
-        "plot": "You are debugging Karel the Robot at Stanford Labs after an AI gained consciousness inside the robot's environment.",
-        "scenes": {
-            "start": {
-                "text": "You are in the Stanford Labs server room. In front of you, Karel the Robot is whirring loudly, its LED eyes blinking red.",
-                "choices": [
-                    {"text": "Analyze Karel's source code with Chris", "scene_key": "start"},
-                    {"text": "Isolate the robot's movement module", "scene_key": "start"},
-                    {"text": "Restart Karel from the terminal", "scene_key": "start"}
-                ]
-            }
+
+def get_fallback_dict(lang):
+    """Return the default fallback dictionary in case of AI and campaign failures."""
+    # Pre-condition - lang is the selected language string
+    # Post-condition - returns a dictionary with the fallback scene data
+    if lang == "en":
+        return {
+            "narrativa": "A strange temporal distortion occurs. You keep moving forward.",
+            "opciones": ["Go forward", "Explore the area"],
+            "cambio_vida": 0,
+            "item_encontrado": None
         }
-    }, "engineer_story"
+    else:
+        return {
+            "narrativa": "Una extraña distorsion en el espacio-tiempo ocurre. Sigues tu camino.",
+            "opciones": ["Continuar adelante", "Explorar el entorno"],
+            "cambio_vida": 0,
+            "item_encontrado": None
+        }
+
+
 
 def roll_d20():
     # Pre-condition - None
@@ -519,8 +496,8 @@ KAREL_ART = [
 
 
 def _detect_terminal_bg():
-    """Detect light or dark terminal background via COLORFGBG env var.
-    Returns 'light' or 'dark'. Defaults to 'dark' on failure."""
+    """Detect light or dark terminal background.
+    Checks COLORFGBG env var first, then defaults to dark."""
     colorfgbg = os.environ.get("COLORFGBG")
     if colorfgbg:
         parts = colorfgbg.split(";")
@@ -530,7 +507,26 @@ def _detect_terminal_bg():
             return "light" if bg >= 7 else "dark"
         except (ValueError, IndexError):
             pass
+            
     return "dark"
+
+
+def initialize_colors():
+    """Set global color variables based on the detected terminal background."""
+    global COLOR_NARRATIVE, COLOR_DAMAGE, COLOR_STATUS, COLOR_MENU, COLOR_CREDITS
+    bg = _detect_terminal_bg()
+    if bg == "light":
+        COLOR_NARRATIVE = "\033[36m"  # Dark Cyan/Teal (good contrast on white)
+        COLOR_DAMAGE = "\033[31m"     # Dark Red
+        COLOR_STATUS = "\033[33m"     # Dark Yellow/Brown (good contrast on white)
+        COLOR_MENU = "\033[35m"       # Dark Magenta
+        COLOR_CREDITS = "\033[32m"    # Dark Green
+    else:
+        COLOR_NARRATIVE = "\033[96m"  # Bright Cyan
+        COLOR_DAMAGE = "\033[91m"     # Bright Red
+        COLOR_STATUS = "\033[93m"     # Bright Yellow
+        COLOR_MENU = "\033[95m"       # Bright Magenta
+        COLOR_CREDITS = "\033[92m"    # Bright Green
 
 
 def karel_splash(lang="en"):
@@ -571,11 +567,21 @@ def wrap(text):
     return textwrap.fill(text, width=width)
 
 
-def typewrite(text, delay=0.03):
+def typewrite(text, delay=0.03, color=None):
     """Print text character by character with a typewriter delay."""
+    # Disable delay during unit test runs to keep test execution fast
+    if "unittest" in sys.modules or "pytest" in sys.modules:
+        delay = 0
+        
     for char in text:
-        print(char, end="", flush=True)
-        time.sleep(delay)
+        if color:
+            print(color + char, end="", flush=True)
+        else:
+            print(char, end="", flush=True)
+        if delay > 0:
+            time.sleep(delay)
+    if color:
+        print(COLOR_RESET, end="", flush=True)
     print()  # final newline
 
 
@@ -594,8 +600,12 @@ def divider(char="═", color=COLOR_NARRATIVE):
 
 
 def clear_screen():
-    """Clear the terminal using ANSI escape codes."""
-    print("\033[2J\033[H", end="")
+    """Clear the terminal using ANSI escape codes or system clear."""
+    if os.name == "nt":
+        os.system("cls")
+    else:
+        # Print ANSI clear escape codes directly. This works reliably on both local and web terminals.
+        print("\033[2J\033[H", end="", flush=True)
 
 
 def screen_break():
@@ -607,13 +617,15 @@ def screen_break():
 # Main game entry point
 # ──────────────────────────────────────────────
 def main():
-    # Pre-condition - None
-    # Post-condition - runs the main bilingual game loop
     
+    # Initialize dynamic color scheme based on terminal background contrast
+    initialize_colors()
+
+
     # Initial language selection menu
-    print("\033[95mSelect Language / Selecciona Idioma\033[0m")
-    print("\033[95m1. English\033[0m")
-    print("\033[95m2. Español\033[0m")
+    print(COLOR_MENU + "Select Language / Selecciona Idioma" + COLOR_RESET)
+    print(COLOR_MENU + "1. English" + COLOR_RESET)
+    print(COLOR_MENU + "2. Español" + COLOR_RESET)
     
     lang = "en"
     # Loop to force the user to pick a valid language option
@@ -630,8 +642,7 @@ def main():
             print("\033[91m[ERROR DE PROTOCOLO / PROTOCOL ERROR] Boot sequence interrupted. Select 1 or 2. / Secuencia de inicio interrumpida. Selecciona 1 o 2.\033[0m")
             print()
             
-    # Load story files based on selected language
-    story_data, nombre_historia = select_story_file(lang)
+
     
     # Initialize player state dictionary
     state = {
@@ -641,63 +652,15 @@ def main():
         "turnos": 0
     }
     
-    messages = []
+    # Load initial scene from the offline campaign data
+    from _campaign import BRANCHING_STORY
+    current_scene_key = "start"
+    start_scene = BRANCHING_STORY["start"]["es" if lang == "es" else "en"]
+    narrativa_actual = start_scene["narrativa"]
+    opciones_actuales = start_scene["opciones"]
     
-    # Configure LLM system prompt with language constraint
-    plot_desc = story_data.get("plot", "Una gran aventura sin explorar.")
-    idioma_completo = "ingles" if lang == "en" else "español"
+    pending_connection_error = None
     
-    system_prompt = (
-        "Eres el narrador e ingeniero de un juego de rol basado en texto. "
-        "STORY_ID - " + nombre_historia + "\n"
-        "La trama general de la historia es - " + plot_desc + "\n"
-        "Debes continuar la historia basandote en la opcion elegida por el jugador y su tirada de dados de 20 caras (d20). "
-        "Un resultado del dado cercano a 1 significa un fracaso catastrofico, peligro o daño. Un resultado cercano a 20 significa un exito critico o recompensa.\n"
-        "REGLA DE IDIOMA CRITICA - Debes generar los campos 'narrativa' y 'opciones' estrictamente en el idioma - " + idioma_completo + ".\n"
-        "REGLA DE FORMATO CRITICA - Debes responder EXCLUSIVAMENTE en un formato JSON plano, sin bloques de codigo markdown de tipo ```json o comillas triples. Tu respuesta debe ser parseable directamente por json.loads.\n"
-        "La estructura del JSON requerido es la siguiente -\n"
-        "{\n"
-        '  "narrativa" - "texto del capitulo actual basado en la opcion, el dado y el idioma",\n'
-        '  "opciones" - ["opcion 1", "opcion 2", "opcion 3"],\n'
-        '  "cambio_vida" - entero_positivo_o_negativo,\n'
-        '  "item_encontrado" - "nombre_de_item_encontrado_o_null"\n'
-        "}"
-    )
-    
-    messages.append({"role": "system", "content": system_prompt})
-    
-    # Load initial scene from local data
-    scenes = story_data.get("scenes", {})
-    current_scene = scenes.get("start", {
-        "text": "Comienza tu aventura." if lang == "es" else "Your adventure begins.",
-        "choices": [{"text": "Empezar" if lang == "es" else "Start", "scene_key": "start"}]
-    })
-    
-    narrativa_actual = current_scene.get("text", "Comienza tu aventura." if lang == "es" else "Your adventure begins.")
-    opciones_actuales = [c.get("text", "") for c in current_scene.get("choices", [])]
-    
-    # Translate the starting scene if playing in Spanish and content is in English
-    if lang == "es" and nombre_historia != "default_story":
-        prompt_traduccion = (
-            "Traduce la siguiente escena inicial y sus opciones al español. "
-            "Debes responder EXCLUSIVAMENTE con un formato JSON plano, sin bloques de codigo markdown de tipo ```json o comillas triples.\n"
-            "Estructura del JSON -\n"
-            "{\n"
-            '  "narrativa" - "texto de la escena traducido al español",\n'
-            '  "opciones" - ["opcion 1 traducida", "opcion 2 traducida", "opcion 3 traducida"]\n'
-            "}\n"
-            "Texto original -\n"
-            "Narrativa - " + narrativa_actual + "\n"
-            "Opciones - " + str(opciones_actuales)
-        )
-        try:
-            respuesta_trad = call_gpt([{"role": "user", "content": prompt_traduccion}])
-            datos_trad = process_response(respuesta_trad, lang)
-            narrativa_actual = datos_trad.get("narrativa", narrativa_actual)
-            opciones_actuales = datos_trad.get("opciones", opciones_actuales)
-        except Exception as e:
-            pass
-            
     # Clear screen and show Karel splash with typewriter first narrative
     clear_screen()
     print(karel_splash(lang))
@@ -751,15 +714,15 @@ def main():
             print()
             print(COLOR_DAMAGE + wrap(TEXT_INTERFACE[lang]["invalid_option"]) + COLOR_RESET)
             pending_invalid_option = False
+
+        if pending_connection_error:
+            print()
+            print(COLOR_DAMAGE + wrap(f"[AI CONNECTION ERROR]: {pending_connection_error}") + COLOR_RESET)
+            pending_connection_error = None
         
         # Display current narrative text with typewriter effect
         print()
-        print(COLOR_NARRATIVE, end="", flush=True)
-        typewrite(narrativa_actual)
-        print(COLOR_RESET, end="", flush=True)
-        
-        # Append current narrative to messages history
-        messages.append({"role": "assistant", "content": narrativa_actual})
+        typewrite(narrativa_actual, color=COLOR_NARRATIVE)
         
         # Display option choices
         print("\n" + COLOR_MENU + TEXT_INTERFACE[lang]["options_title"] + COLOR_RESET)
@@ -799,7 +762,7 @@ def main():
         num_backpack_items = len(state["mochila"])
         
         if 0 <= seleccion < num_story_options:
-            opcion_elegida = opciones_actuales[seleccion]
+            pass
         elif num_backpack_items > 0 and num_story_options <= seleccion < num_story_options + num_backpack_items:
             # Use a backpack item — does NOT consume a turn
             item_idx = seleccion - num_story_options
@@ -811,40 +774,23 @@ def main():
             continue
         else:
             pending_invalid_option = True
-            messages.pop()
             continue
         
         # Roll d20 dice
         dado = roll_d20()
         
-        # Inject dice, choice, and backpack context into user prompt
-        if lang == "es":
-            prompt_usuario = (
-                "El jugador ha elegido la opcion - '" + opcion_elegida + "'.\n"
-                "El resultado de la tirada del dado d20 es - " + str(dado) + ".\n"
-                "Inventario actual en la mochila - " + str(state["mochila"]) + ".\n"
-                "Genera la consecuencia del turno en el idioma - " + idioma_completo + "."
-            )
-        else:
-            prompt_usuario = (
-                "The player has chosen the option - '" + opcion_elegida + "'.\n"
-                "The result of the d20 dice roll is - " + str(dado) + ".\n"
-                "Current backpack inventory - " + str(state["mochila"]) + ".\n"
-                "Generate the turn consequence in the language - " + idioma_completo + "."
-            )
-        
-        messages.append({"role": "user", "content": prompt_usuario})
-        
-        print(COLOR_MENU + TEXT_INTERFACE[lang]["destiny"] + COLOR_RESET)
+        # Call campaign engine to get next scene
         try:
-            respuesta_cruda = call_gpt(messages)
+            respuesta_cruda = call_gpt(current_scene_key, seleccion, dado, lang)
             respuesta = process_response(respuesta_cruda, lang)
         except Exception as e:
-            respuesta = process_response("", lang)
+            pending_connection_error = str(e)
+            respuesta = get_fallback_dict(lang)
             
         # Update player state based on parsed model response
         narrativa_actual = respuesta.get("narrativa", "Continuas tu camino." if lang == "es" else "You continue on your path.")
         opciones_actuales = respuesta.get("opciones", ["Seguir adelante" if lang == "es" else "Go forward"])
+        current_scene_key = respuesta.get("next_scene_key", "start")
         
         cambio = respuesta.get("cambio_vida", 0)
         state["hp"] += cambio
@@ -864,7 +810,7 @@ def main():
             
         state["turnos"] += 1
         
-        # Check if the AI signals a story victory
+        # Check if the campaign signals a story victory
         if respuesta.get("victoria"):
             print()
             print(divider())

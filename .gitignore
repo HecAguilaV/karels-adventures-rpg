@@ -2,7 +2,6 @@
 local/
 proyectofinal/
 openspec/
-tests/
 
 # --- Extensiones y Configuración de Agentes (Cursor, Antigravity, etc.) ---
 *.gga
@@ -17,3 +16,6 @@ Thumbs.db
 # ---Caché de Python ---
 __pycache__/
 *.pyc
+
+# --- Credenciales Locales ---
+.env
