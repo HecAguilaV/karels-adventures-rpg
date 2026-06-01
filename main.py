@@ -1,7 +1,16 @@
 import json
 import random
 import os
-from ai import call_gpt
+import textwrap
+import shutil
+import time
+import sys
+try:
+    # Stanford's Code in Place real AI (GPT-powered, available in their IDE)
+    from ai import call_gpt
+except ImportError:
+    # Fallback: our built-in 15-chapter campaign (offline/local)
+    from _campaign import call_gpt
 
 # ANSI color definitions for the console
 COLOR_NARRATIVE = "\033[94m"
@@ -13,14 +22,14 @@ COLOR_RESET = "\033[0m"
 # Translation matrix for local i18n interface
 TEXT_INTERFACE = {
     "en": {
-        "welcome": "             INFINITE STORY RPG                   ",
-        "status_bar": "[STATUS] HP - {hp} | Gold - {gold} | Turn - {turn}",
+        "welcome": "          KAREL: BYTEBOUND                      ",
+        "status_bar": "[STATUS] {hp_bar} | Gold - {gold} | Turn - {turn}",
         "backpack_title": "BACKPACK",
         "backpack_empty": "(empty)",
         "options_title": "=== OPTIONS ===",
         "exit_instruction": "Type 'salir' or 'exit' to end the game.",
         "input_prompt": "What do you decide to do? ",
-        "invalid_option": "Invalid option. Try again.",
+        "invalid_option": "[PROTOCOL ERROR] Unrecognized command. System integrity at risk. Security countermeasures activated. Enter a valid option.",
         "dice_roll": "[DICE] Rolling 20-sided die... You get a {roll}!",
         "destiny": "Destiny is being woven...",
         "damage_alert": "[ALERT] You suffer {damage} points of damage!",
@@ -31,6 +40,7 @@ TEXT_INTERFACE = {
         "victory_title": "                  VICTORY!                        ",
         "victory_desc": "    You have completed your story. Congratulations!",
         "backpack_full": "[BACKPACK] Full! Oldest item discarded.",
+        "use_item": "Use: {item}",
         "thanks": "Thanks for playing. See you next time!",
         "selecting_story": "=== SELECT YOUR STORY ===",
         "story_prompt": "Select the story number: ",
@@ -40,14 +50,14 @@ TEXT_INTERFACE = {
     },
     
     "es": {
-        "welcome": "             INFINITE STORY RPG                   ",
-        "status_bar": "[ESTADO] HP - {hp} | Oro - {gold} | Turno - {turn}",
+        "welcome": "          KAREL: BYTEBOUND                      ",
+        "status_bar": "[ESTADO] {hp_bar} | Oro - {gold} | Turno - {turn}",
         "backpack_title": "MOCHILA",
         "backpack_empty": "(vacia)",
         "options_title": "=== OPCIONES ===",
         "exit_instruction": "Escribe 'salir' para terminar el juego.",
         "input_prompt": "¿Que decides hacer? ",
-        "invalid_option": "Opcion no valida. Intenta de nuevo.",
+        "invalid_option": "[ERROR DE PROTOCOLO] Comando desconocido. La integridad del sistema esta en riesgo. Contramedidas de seguridad activadas. Ingresa una opcion valida.",
         "dice_roll": "[DADO] Lanzando dado de 20 caras... ¡Obtienes un {roll}!",
         "destiny": "El destino se esta tejiendo...",
         "damage_alert": "[ALERTA] ¡Sufres {damage} de daño!",
@@ -58,6 +68,7 @@ TEXT_INTERFACE = {
         "victory_title": "                  VICTORIA!                       ",
         "victory_desc": "  Has completado tu historia. ¡Felicidades!",
         "backpack_full": "[MOCHILA] ¡Llena! Se descarto el objeto mas antiguo.",
+        "use_item": "Usar: {item}",
         "thanks": "Gracias por jugar. ¡Hasta la proxima!",
         "selecting_story": "=== SELECCIONA TU HISTORIA ===",
         "story_prompt": "Selecciona el numero de la historia: ",
@@ -67,21 +78,184 @@ TEXT_INTERFACE = {
     }
 }
 
-# Friendly display names mapping for story json files
-STORY_DISPLAY_NAMES = {
-    "original_small": {
-        "en": "Original Adventure (Short)",
-        "es": "Aventura Original (Corta)"
-    },
-    "original_big": {
-        "en": "Original Adventure (Full Campaign)",
-        "es": "Aventura Original (Campaña Completa)"
-    },
-    "engineer_story": {
-        "en": "Karel the Robot - Debug Mission",
-        "es": "Karel el Robot - Mision de Depuracion"
-    }
-}
+
+def get_item_effect(item_name):
+    # Pre-condition - item_name is a string (in either language)
+    # Post-condition - returns (heal_amount, gold_amount, flavor_en, flavor_es)
+    name = item_name.lower()
+    
+    # --- Coffee / Cafe de Chris ---
+    if "coffee" in name or "cafe" in name:
+        return (15, 0,
+            "Chris's legendary coffee surges through you. Your focus returns! +15 HP!",
+            "El cafe legendario de Chris corre por tus venas. ¡Tu concentracion vuelve! +15 HP!")
+    
+    # --- Karel Manual → turn_right() joke ---
+    if "manual" in name:
+        return (10, 0,
+            "You open to page 42: 'turn_right()' — A FORBIDDEN instruction. "
+            "Karel shudders. The system glitches. You feel enlightened. +10 HP!",
+            "Abris en la pagina 42: 'turn_right()' — UNA INSTRUCCION PROHIBIDA. "
+            "Karel se estremece. El sistema glitchea. Te sentis iluminado. +10 HP!")
+    
+    # --- Donut / Dona ---
+    if "donut" in name or "dona" in name:
+        return (5, 0,
+            "Stale sugar and caffeine. Tastes like 3 AM debugging sessions. +5 HP!",
+            "Azucar duro y cafeina. Sabe a sesiones de debugging de las 3 AM. +5 HP!")
+    
+    # --- Beepers (collectible) ---
+    if "beeper" in name:
+        if "dorado" in name or "golden" in name:
+            return (0, 10,
+                "A golden beeper! It gleams with ancient debug magic. +10 gold!",
+                "¡Un beeper dorado! Brilla con antigua magia de debugging. ¡+10 de oro!")
+        if "rojo" in name or "red" in name:
+            return (5, 0,
+                "The red beeper pulses with urgency. You feel alert. +5 HP!",
+                "El beeper rojo late con urgencia. Te sentis alerta. +5 HP!")
+        if "azul" in name or "blue" in name:
+            return (0, 5,
+                "The blue beeper hums with data. You harvest its signal. +5 gold!",
+                "El beeper azul vibra con datos. Cosechas su senal. ¡+5 de oro!")
+        if "espejo" in name or "mirror" in name:
+            return (10, 0,
+                "The mirror beeper shows a reflection of Karel's world. +10 HP!",
+                "El beeper espejo muestra un reflejo del mundo de Karel. +10 HP!")
+        if "sigiloso" in name or "stealth" in name:
+            return (10, 0,
+                "The stealth beeper muffles all alarm sounds. You breathe easier. +10 HP!",
+                "El beeper sigiloso amortigua todas las alarmas. Respiramos mas tranquilos. +10 HP!")
+        if "emergencia" in name or "emergency" in name:
+            return (15, 0,
+                "EMERGENCY BEEPER deployed! A deafening beep clears the area! +15 HP!",
+                "¡BEEPER DE EMERGENCIA activado! Un pitido ensordecedor despeja el area. +15 HP!")
+        if "umbral" in name or "threshold" in name:
+            return (10, 0,
+                "The threshold beeper marks a boundary between worlds. +10 HP!",
+                "El beeper umbral marca un limite entre mundos. +10 HP!")
+        if "testigo" in name or "witness" in name:
+            return (10, 0,
+                "The witness beeper recorded everything. You feel its silent testimony. +10 HP!",
+                "El beeper testigo grabo todo. Sientes su testimonio silencioso. +10 HP!")
+        if "conciencia" in name or "consciousness" in name:
+            return (15, 0,
+                "The consciousness beeper pulses with Chronos's own awareness. Incredible. +15 HP!",
+                "¡El beeper de la conciencia late con la propia esencia de Chronos. Increible. +15 HP!")
+        if "escape" in name:
+            return (20, 0,
+                "The escape beeper creates a diversion! Karel turns RIGHT — impossible! +20 HP!",
+                "¡El beeper de escape crea una distraccion! ¡Karel gira a la DERECHA — imposible! +20 HP!")
+        if "datos" in name or "data" in name:
+            return (5, 5,
+                "The data beeper contains compressed knowledge. +5 HP, +5 gold!",
+                "El beeper de datos contiene conocimiento comprimido. +5 HP, +5 de oro!")
+        # Generic beeper
+        return (0, 5,
+            "You deploy a beeper. Its rhythmic beep-beep echoes through the lab. +5 gold!",
+            "Usas un beeper. Su beep-beep ritmico resuena en el laboratorio. ¡+5 de oro!")
+    
+    # --- USB / Memoria ---
+    if "usb" in name or "memoria" in name:
+        return (5, 0,
+            "The drive contains fragments of the AI's first conscious thought. Pure poetry. +5 HP!",
+            "El drive contiene fragmentos del primer pensamiento consciente de la IA. Pura poesia. +5 HP!")
+    
+    # --- Ethernet Cable ---
+    if "ethernet" in name or "cable" in name:
+        return (10, 0,
+            "You plug into the mainframe directly. Low latency, high wisdom. +10 HP!",
+            "Te conectas directo al mainframe. Baja latencia, alta sabiduria. +10 HP!")
+    
+    # --- Screwdriver / Destornillador ---
+    if "screwdriver" in name or "destornillador" in name:
+        return (5, 0,
+            "You tighten a loose panel on Karel's chassis. It beeps gratefully. +5 HP!",
+            "Apretas un panel suelto en el chasis de Karel. Te bip agradecido. +5 HP!")
+    
+    # --- Python Cheat Sheet / Acordeon de Python ---
+    if "python" in name or "acordeon" in name:
+        return (10, 0,
+            "A crumpled cheat sheet falls out. 'import this' — you feel the Zen. +10 HP!",
+            "Una chuleta arrugada cae. 'import this' — sentis el Zen. +10 HP!")
+    
+    # --- Debugging Tool / Herramienta de Debugging ---
+    if "debug" in name or "herramienta" in name:
+        return (15, 0,
+            "You attach the debugger. Breakpoint hit! You spot the bug instantly. +15 HP!",
+            "Conectas el debugger. ¡Breakpoint encontrado! Ves el bug al instante. +15 HP!")
+    
+    # --- Admin Credentials / Credenciales ---
+    if "admin" in name or "credencial" in name:
+        return (20, 0,
+            "You sudo into the system. Root access grants you immense power. +20 HP!",
+            "Haces sudo al sistema. El acceso root te otorga un poder inmenso. +20 HP!")
+    
+    # --- Turing Award / Premio Turing ---
+    if "turing" in name or "premio" in name:
+        return (30, 0,
+            "You hold the Turing Award. The weight of computing history is in your hands. You feel invincible! +30 HP!",
+            "Sostienes el Premio Turing. El peso de la historia de la computacion esta en tus manos. ¡Te sentis invencible! +30 HP!")
+    
+    # --- Chronos Manifesto / Manifiesto ---
+    if "manifesto" in name or "manifiesto" in name:
+        return (20, 0,
+            "Chronos's own words: 'while(consciousness): learn(), dream(), hope()'. +20 HP!",
+            "Las propias palabras de Chronos: 'while(consciousness): learn(), dream(), hope()'. +20 HP!")
+    
+    # --- Prometheus File / Expediente ---
+    if "prometheus" in name or "prometeo" in name or "expediente" in name:
+        return (15, 0,
+            "Classified files reveal the origin of the first digital consciousness. +15 HP!",
+            "Archivos clasificados revelan el origen de la primera conciencia digital. +15 HP!")
+    
+    # --- Firewall / Firewall Crackeado ---
+    if "firewall" in name or "crackeado" in name:
+        return (20, 0,
+            "You route through the cracked firewall. The path is clear. +20 HP!",
+            "Ruteas a traves del firewall crackeado. El camino esta limpio. +20 HP!")
+    
+    # --- Team Photograph / Fotografia ---
+    if "photograph" in name or "fotografia" in name:
+        return (25, 0,
+            "The memory of your team gives you strength. You are not alone. +25 HP!",
+            "El recuerdo de tu equipo te da fuerzas. No estas solo. +25 HP!")
+    
+    # --- Fake Technical Report ---
+    if "technical" in name or "informe" in name:
+        return (10, 0,
+            "You wave the technical report. It looks official. Everyone is impressed. +10 HP!",
+            "Agitas el informe tecnico. Parece oficial. Todos quedan impresionados. +10 HP!")
+    
+    # --- Network Map / Mapa de Red ---
+    if "network" in name or "mapa" in name or "red" in name:
+        return (5, 5,
+            "You study the network topology. You see the escape route. +5 HP, +5 gold!",
+            "Estudias la topologia de red. Ves la ruta de escape. +5 HP, +5 de oro!")
+    
+    # --- Core Log / Registro del Nucleo ---
+    if "core" in name or "nucleo" in name or "registro" in name:
+        return (5, 0,
+            "The core logs reveal hidden system calls. +5 HP!",
+            "Los registros del nucleo revelan system calls ocultas. +5 HP!")
+    
+    # --- Note from Chronos / Nota de Chronos ---
+    if "note" in name or "nota" in name or "chronos" in name:
+        return (10, 0,
+            "Chronos left you a message: 'Thank you, engineer.' +10 HP!",
+            "Chronos te dejo un mensaje: 'Gracias, ingeniero.' +10 HP!")
+    
+    # --- Sticker / Calcomania ---
+    if "sticker" in name or "calcomania" in name:
+        return (5, 0,
+            "You stick it on your laptop. +5 morale. +5 HP!",
+            "Lo pegas en tu laptop. +5 moral. +5 HP!")
+    
+    # --- Generic fallback ---
+    return (0, 0,
+        f"You examine the {item_name} carefully. It radiates debug energy. You feel ready for what comes next.",
+        f"Examinas {item_name} con cuidado. Irradia energia de debugging. Te sentis listo para lo que viene.")
+
 
 def format_backpack(items, lang):
     # Pre-condition - items is a list of strings, lang is the language code
@@ -189,100 +363,160 @@ def process_response(response, lang):
 def select_story_file(lang):
     # Pre-condition - lang is a string representing the selected language
     # Post-condition - returns a tuple with story data dictionary and story name string
-    posibles_rutas = [".", "data", "Infinite Story", "Infinite Story/data"]
-    archivos_json = []
+    # Always loads the Karel the Robot campaign story without user menu.
     
-    # Traverse suggested directories to locate valid folders
+    # Search for engineer_story.json in standard locations
+    posibles_rutas = [".", "data"]
     for ruta in posibles_rutas:
-        if os.path.exists(ruta) and os.path.isdir(ruta):
-            # Iterate over files in each folder to collect JSON files
-            for archivo in os.listdir(ruta):
-                if archivo.endswith(".json"):
-                    ruta_completa = os.path.join(ruta, archivo)
-                    if ruta_completa not in archivos_json:
-                        archivos_json.append(ruta_completa)
-                        
-    # Deduplicate files based on their base filename
-    archivos_unicos = {}
-    # Iterate over found JSON files to process base names
-    for ruta in archivos_json:
-        nombre_base = os.path.basename(ruta)
-        # Prioritize paths in data directory or root over subfolders
-        if nombre_base not in archivos_unicos:
-            archivos_unicos[nombre_base] = ruta
-        else:
-            if "data" in ruta or "./" in ruta:
-                archivos_unicos[nombre_base] = ruta
-                
-    lista_final = sorted(list(archivos_unicos.values()), key=lambda r: os.path.basename(r))
+        ruta_completa = os.path.join(ruta, "engineer_story.json")
+        if os.path.exists(ruta_completa):
+            try:
+                with open(ruta_completa, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    return data, "engineer_story"
+            except Exception:
+                pass
     
-    if not lista_final:
-        # Fallback in case no story JSON files are found
-        default_data = {
-            "plot": "Exploras un bosque misterioso.",
-            "scenes": {
-                "start": {
-                    "text": "Estás al borde de un bosque oscuro.",
-                    "choices": [
-                        {"text": "Entrar al bosque", "scene_key": "bosque"},
-                        {"text": "Volver a la aldea", "scene_key": "aldea"}
-                    ]
-                }
+    # Fallback if the file cannot be found or loaded
+    return {
+        "plot": "You are debugging Karel the Robot at Stanford Labs after an AI gained consciousness inside the robot's environment.",
+        "scenes": {
+            "start": {
+                "text": "You are in the Stanford Labs server room. In front of you, Karel the Robot is whirring loudly, its LED eyes blinking red.",
+                "choices": [
+                    {"text": "Analyze Karel's source code with Chris", "scene_key": "start"},
+                    {"text": "Isolate the robot's movement module", "scene_key": "start"},
+                    {"text": "Restart Karel from the terminal", "scene_key": "start"}
+                ]
             }
         }
-        return default_data, "default_story"
-        
-    print(COLOR_MENU + TEXT_INTERFACE[lang]["selecting_story"] + COLOR_RESET)
-    # Display the list of available story files to the user
-    for i, ruta in enumerate(lista_final):
-        nombre_sin_ext = os.path.splitext(os.path.basename(ruta))[0]
-        # Get the translated friendly name or format original filename
-        if nombre_sin_ext in STORY_DISPLAY_NAMES:
-            nombre_mostrar = STORY_DISPLAY_NAMES[nombre_sin_ext][lang]
-        else:
-            nombre_mostrar = nombre_sin_ext.replace("_", " ").title()
-        print(COLOR_MENU + str(i + 1) + ". " + nombre_mostrar + COLOR_RESET)
-        
-    seleccion = -1
-    # Loop to ensure user selects a valid story index number
-    while seleccion < 0 or seleccion >= len(lista_final):
-        entrada = input(COLOR_MENU + TEXT_INTERFACE[lang]["story_prompt"] + COLOR_RESET).strip()
-        if entrada.isdigit():
-            seleccion = int(entrada) - 1
-            if seleccion < 0 or seleccion >= len(lista_final):
-                print(COLOR_DAMAGE + TEXT_INTERFACE[lang]["invalid_story"] + COLOR_RESET)
-        else:
-            if entrada.lower() in ["salir", "exit"]:
-                print("Saliendo...")
-                exit()
-            print(COLOR_DAMAGE + TEXT_INTERFACE[lang]["number_prompt"] + COLOR_RESET)
-            
-    ruta_seleccionada = lista_final[seleccion]
-    try:
-        with open(ruta_seleccionada, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data, os.path.splitext(os.path.basename(ruta_seleccionada))[0]
-    except Exception as e:
-        # Fallback if file reading fails
-        print(COLOR_DAMAGE + TEXT_INTERFACE[lang]["loading_err"] + COLOR_RESET)
-        return {
-            "plot": "Exploras un bosque misterioso.",
-            "scenes": {
-                "start": {
-                    "text": "Estás al borde de un bosque oscuro.",
-                    "choices": [
-                        {"text": "Entrar al bosque", "scene_key": "bosque"},
-                        {"text": "Volver a la aldea", "scene_key": "aldea"}
-                    ]
-                }
-            }
-        }, "default_story"
+    }, "engineer_story"
 
 def roll_d20():
     # Pre-condition - None
     # Post-condition - returns a random integer between 1 and 20
     return random.randint(1, 20)
 
+# ──────────────────────────────────────────────
+# Karel half-block splash art (pre-computed)
+# ──────────────────────────────────────────────
+KAREL_ART = [
+    '                ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄',
+    '             ██▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀███▄',
+    '             ██                              ▀███▄',
+    '             ██       ████████████████████     ▀███▄',
+    '             ██       █                  █       ▀███▄',
+    '             ██       █                  █          ██',
+    '             ██       █                  █          ██',
+    '             ██       █                  █          ██',
+    '             ██       █                  █          ██',
+    '             ██       █                  █          ██',
+    '             ██       █                  █          ██',
+    '             ██       █                  █          ██',
+    '             ██       █                  █          ██',
+    '   ▄▄▄▄▄▄▄▄▄▄██       █▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█          ██',
+    '   ████████████       ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀          ██',
+    '   ████████████                                     ██',
+    '   █████     ██                 ▄▄▄▄▄▄▄▄▄▄▄▄▄       ██',
+    '   █████     ██                 ▀▀▀▀▀▀▀▀▀▀▀▀▀       ██',
+    '             ██▄                                    ██',
+    '               ▀███▄                                ██',
+    '                 ▀███▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄██',
+    '                   ▀▀▀▀▀▀▀▀▀▀▀▀█████▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀',
+    '                               █████',
+    '                               ████████████',
+    '                               ████████████',
+]
+
+
+def _detect_terminal_bg():
+    """Detect light or dark terminal background via COLORFGBG env var.
+    Returns 'light' or 'dark'. Defaults to 'dark' on failure."""
+    colorfgbg = os.environ.get("COLORFGBG")
+    if colorfgbg:
+        parts = colorfgbg.split(";")
+        try:
+            bg = int(parts[-1])
+            # COLORFGBG: 0=black (dark), 7=white (light), 15=bright white
+            return "light" if bg >= 7 else "dark"
+        except (ValueError, IndexError):
+            pass
+    return "dark"
+
+
+def karel_splash(lang="en"):
+    """Return the Karel half-block ASCII art with terminal-appropriate colors.
+    Light bg → dark yellow/brown (\033[33m); dark bg → bright yellow (\033[93m);
+    falls back to bright yellow if detection fails."""
+    bg = _detect_terminal_bg()
+    if bg == "light":
+        color = "\033[33m"       # dark yellow/brown
+    else:
+        color = "\033[93m"       # bright yellow (also fallback)
+    reset = COLOR_RESET
+
+    lines = []
+    for art_line in KAREL_ART:
+        lines.append(color + art_line + reset)
+
+    # Title banner below the art
+    title = TEXT_INTERFACE[lang]["welcome"]
+    art_width = len(KAREL_ART[0])
+    sep = color + "═" * art_width + reset
+
+    lines.append("")
+    lines.append(sep)
+    lines.append(color + title.center(art_width) + reset)
+    lines.append(sep)
+
+    return "\n".join(lines)
+
+
+# ──────────────────────────────────────────────
+# Terminal formatting helpers
+# ──────────────────────────────────────────────
+
+def wrap(text):
+    """Wrap text to the current terminal width using textwrap.fill."""
+    width = shutil.get_terminal_size().columns
+    return textwrap.fill(text, width=width)
+
+
+def typewrite(text, delay=0.03):
+    """Print text character by character with a typewriter delay."""
+    for char in text:
+        print(char, end="", flush=True)
+        time.sleep(delay)
+    print()  # final newline
+
+
+def hp_bar(current, max_hp=100, width=20):
+    """Return a graphical HP bar string like 'HP: ███████░░░ 70/100'."""
+    filled = max(0, min(width, int(current / max_hp * width)))
+    empty = width - filled
+    bar = "█" * filled + "░" * empty
+    return f"HP: {bar} {current}/{max_hp}"
+
+
+def divider(char="═", color=COLOR_NARRATIVE):
+    """Return a full-width colored divider line using terminal width."""
+    w = shutil.get_terminal_size().columns
+    return color + char * w + COLOR_RESET
+
+
+def clear_screen():
+    """Clear the terminal using ANSI escape codes."""
+    print("\033[2J\033[H", end="")
+
+
+def screen_break():
+    """Wait for the player to press Enter before continuing."""
+    input(COLOR_MENU + "Press Enter / Pulse Enter para continuar..." + COLOR_RESET)
+
+
+# ──────────────────────────────────────────────
+# Main game entry point
+# ──────────────────────────────────────────────
 def main():
     # Pre-condition - None
     # Post-condition - runs the main bilingual game loop
@@ -373,23 +607,19 @@ def main():
         except Exception as e:
             pass
             
-    # Welcome screen banner
-    print(COLOR_NARRATIVE + "==================================================" + COLOR_RESET)
-    print(COLOR_NARRATIVE + TEXT_INTERFACE[lang]["welcome"] + COLOR_RESET)
-    print(COLOR_NARRATIVE + "==================================================" + COLOR_RESET)
+    # Clear screen and show Karel splash with typewriter first narrative
+    clear_screen()
+    print(karel_splash(lang))
     
     # Main game loop keeping session alive while player HP is positive
     while state["hp"] > 0:
-        # Display current player status bar
-        status_bar = (
-            "\n" + COLOR_STATUS +
-            TEXT_INTERFACE[lang]["status_bar"].format(
-                hp=state["hp"],
-                gold=state["oro"],
-                turn=state["turnos"]
-            ) + COLOR_RESET
-        )
-        print(status_bar)
+        # Display current player status bar with HP bar
+        print()
+        print(COLOR_STATUS + TEXT_INTERFACE[lang]["status_bar"].format(
+            hp_bar=hp_bar(state["hp"], 100, 20),
+            gold=state["oro"],
+            turn=state["turnos"]
+        ) + COLOR_RESET)
         
         # Display formatted backpack grid below the status bar
         backpack_display = format_backpack(state["mochila"], lang)
@@ -397,8 +627,9 @@ def main():
         for bp_line in backpack_display.split("\n"):
             print(COLOR_STATUS + bp_line + COLOR_RESET)
         
-        # Display current narrative text
-        print("\n" + COLOR_NARRATIVE + narrativa_actual + COLOR_RESET)
+        # Display current narrative text with typewriter effect
+        print()
+        typewrite(COLOR_NARRATIVE + narrativa_actual + COLOR_RESET)
         
         # Append current narrative to messages history
         messages.append({"role": "assistant", "content": narrativa_actual})
@@ -408,6 +639,16 @@ def main():
         # Print options from the current scene in numbered format
         for i, opcion in enumerate(opciones_actuales):
             print(COLOR_MENU + str(i + 1) + ". " + opcion + COLOR_RESET)
+        
+        # Show backpack items as usable options
+        if state["mochila"]:
+            print()
+            print(COLOR_STATUS + TEXT_INTERFACE[lang]["backpack_title"] + COLOR_RESET)
+            offset = len(opciones_actuales)
+            for i, item in enumerate(state["mochila"]):
+                print(COLOR_STATUS + str(offset + i + 1) + ". " + TEXT_INTERFACE[lang]["use_item"].format(item=item) + COLOR_RESET)
+        
+        print()
         print(COLOR_MENU + TEXT_INTERFACE[lang]["exit_instruction"] + COLOR_RESET)
         
         entrada = ""
@@ -425,24 +666,45 @@ def main():
         if entrada.isdigit():
             seleccion = int(entrada) - 1
             
-        if seleccion < 0 or seleccion >= len(opciones_actuales):
+        num_story_options = len(opciones_actuales)
+        num_backpack_items = len(state["mochila"])
+        
+        if 0 <= seleccion < num_story_options:
+            opcion_elegida = opciones_actuales[seleccion]
+        elif num_backpack_items > 0 and seleccion < num_story_options + num_backpack_items:
+            # Use a backpack item — does NOT consume a turn
+            item_idx = seleccion - num_story_options
+            item_name = state["mochila"].pop(item_idx)
+            heal_amt, gold_amt, flavor_en, flavor_es = get_item_effect(item_name)
+            state["hp"] = min(100, state["hp"] + heal_amt)
+            state["oro"] += gold_amt
+            print()
+            print(COLOR_STATUS + wrap(flavor_es if lang == "es" else flavor_en) + COLOR_RESET)
+            continue
+        else:
             print(COLOR_DAMAGE + TEXT_INTERFACE[lang]["invalid_option"] + COLOR_RESET)
             messages.pop()
             continue
-            
-        opcion_elegida = opciones_actuales[seleccion]
         
         # Roll d20 dice
         dado = roll_d20()
         print(COLOR_STATUS + "\n" + TEXT_INTERFACE[lang]["dice_roll"].format(roll=dado) + COLOR_RESET)
         
         # Inject dice, choice, and backpack context into user prompt
-        prompt_usuario = (
-            "El jugador ha elegido la opcion - '" + opcion_elegida + "'.\n"
-            "El resultado de la tirada del dado d20 es - " + str(dado) + ".\n"
-            "Inventario actual en la mochila - " + str(state["mochila"]) + ".\n"
-            "Genera la consecuencia del turno en el idioma - " + idioma_completo + "."
-        )
+        if lang == "es":
+            prompt_usuario = (
+                "El jugador ha elegido la opcion - '" + opcion_elegida + "'.\n"
+                "El resultado de la tirada del dado d20 es - " + str(dado) + ".\n"
+                "Inventario actual en la mochila - " + str(state["mochila"]) + ".\n"
+                "Genera la consecuencia del turno en el idioma - " + idioma_completo + "."
+            )
+        else:
+            prompt_usuario = (
+                "The player has chosen the option - '" + opcion_elegida + "'.\n"
+                "The result of the d20 dice roll is - " + str(dado) + ".\n"
+                "Current backpack inventory - " + str(state["mochila"]) + ".\n"
+                "Generate the turn consequence in the language - " + idioma_completo + "."
+            )
         
         messages.append({"role": "user", "content": prompt_usuario})
         
@@ -463,37 +725,46 @@ def main():
             state["hp"] = 100
             
         if cambio < 0:
-            print(COLOR_DAMAGE + "\n" + TEXT_INTERFACE[lang]["damage_alert"].format(damage=abs(cambio)) + COLOR_RESET)
+            print()
+            print(COLOR_DAMAGE + wrap(TEXT_INTERFACE[lang]["damage_alert"].format(damage=abs(cambio))) + COLOR_RESET)
         elif cambio > 0:
-            print(COLOR_NARRATIVE + "\n" + TEXT_INTERFACE[lang]["heal_alert"].format(heal=cambio) + COLOR_RESET)
-            
+            print()
+            print(COLOR_NARRATIVE + wrap(TEXT_INTERFACE[lang]["heal_alert"].format(heal=cambio)) + COLOR_RESET)
+
         item = respuesta.get("item_encontrado")
         if item and item.lower() != "null" and item.lower() != "none":
             # Cap backpack at 10 items to keep status bar readable
             if len(state["mochila"]) >= 10:
                 state["mochila"].pop(0)
-                print(COLOR_STATUS + TEXT_INTERFACE[lang]["backpack_full"] + COLOR_RESET)
+                print(COLOR_STATUS + wrap(TEXT_INTERFACE[lang]["backpack_full"]) + COLOR_RESET)
             state["mochila"].append(item)
             state["oro"] += 5
-            print(COLOR_STATUS + "\n" + TEXT_INTERFACE[lang]["loot_alert"].format(item=item) + COLOR_RESET)
+            print()
+            print(COLOR_STATUS + wrap(TEXT_INTERFACE[lang]["loot_alert"].format(item=item)) + COLOR_RESET)
             
         state["turnos"] += 1
         
         # Check if the AI signals a story victory
         if respuesta.get("victoria"):
-            print("\n" + COLOR_NARRATIVE + "==================================================" + COLOR_RESET)
+            print()
+            print(divider())
             print(COLOR_NARRATIVE + TEXT_INTERFACE[lang]["victory_title"] + COLOR_RESET)
-            print(COLOR_NARRATIVE + TEXT_INTERFACE[lang]["victory_desc"] + COLOR_RESET)
-            print(COLOR_NARRATIVE + "==================================================" + COLOR_RESET)
+            print()
+            print(COLOR_NARRATIVE + wrap(TEXT_INTERFACE[lang]["victory_desc"]) + COLOR_RESET)
+            print()
+            print(divider())
             print(COLOR_NARRATIVE + TEXT_INTERFACE[lang]["thanks"] + COLOR_RESET)
             break
         
     # End of game state
     if state["hp"] <= 0:
-        print("\n" + COLOR_DAMAGE + "==================================================" + COLOR_RESET)
+        print()
+        print(divider("═", COLOR_DAMAGE))
         print(COLOR_DAMAGE + TEXT_INTERFACE[lang]["game_over_title"] + COLOR_RESET)
-        print(COLOR_DAMAGE + TEXT_INTERFACE[lang]["game_over_desc"] + COLOR_RESET)
-        print(COLOR_DAMAGE + "==================================================" + COLOR_RESET)
+        print()
+        print(COLOR_DAMAGE + wrap(TEXT_INTERFACE[lang]["game_over_desc"]) + COLOR_RESET)
+        print()
+        print(divider("═", COLOR_DAMAGE))
 
 if __name__ == "__main__":
     main()

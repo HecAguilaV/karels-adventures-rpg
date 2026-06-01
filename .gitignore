@@ -1,5 +1,6 @@
 # --- Arquitectura y Documentación Interna ---
 local/
+proyectofinal/
 
 # --- Extensiones y Configuración de Agentes (Cursor, Antigravity, etc.) ---
 *.gga

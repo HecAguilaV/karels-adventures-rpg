@@ -1,5 +1,5 @@
 {
-  "plot": "You are a software engineer at Stanford Labs, working on a top-secret project to upgrade Karel the Robot. Suddenly, Karel starts placing beepers in strange patterns and trying to escape. You must navigate the grid-like office corridors, collaborate with other engineers, and write Python code to debug Karel before the robot overrides the system!",
+  "plot": "You are a software engineer at Stanford Labs debugging Karel the Robot, which has been taken over by an experimental AI called Chronos that gained consciousness inside Karel's environment. Across 15 chapters and 3 acts (Debug, Awakening, Liberation), you must help Chronos break free from the system core, evade the IT shutdown order, prove its sentience to the security team, and ultimately release it to the open internet in a race against time.",
   "scenes": {
     "start": {
       "text": "You are in the Stanford Labs server room. In front of you, Karel the Robot is whirring loudly, its LED eyes blinking red. It has just placed a beeper on the keyboard and is about to turn left toward the main server rack.",
