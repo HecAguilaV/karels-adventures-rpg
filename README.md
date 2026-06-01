@@ -146,12 +146,6 @@ Clear cached bytecode if you've made changes:
 rm -rf __pycache__/ && python3 main.py
 ```
 
-## Running Tests
-
-```bash
-python3 -m pytest tests/ -v
-```
-
 ---
 
 ## Attribution

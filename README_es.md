@@ -146,12 +146,6 @@ Limpia el bytecode cacheado si hiciste cambios:
 rm -rf __pycache__/ && python3 main.py
 ```
 
-## Ejecutar Pruebas
-
-```bash
-python3 -m pytest tests/ -v
-```
-
 ---
 
 ## Atribuciones
