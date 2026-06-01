@@ -140,7 +140,7 @@ rm -rf __pycache__/ && python3 main.py
 
 ## Atribuciones
 
-- **Karel el Robot**: Concepto original de **Richard E. Pattis** (Universidad de Stanford, 1981). Usado en CS106A de Stanford por décadas. Más info en [stanford.edu/class/cs106a/](https://stanford.edu/class/cs106a/).
+- **Karel el Robot**: Concepto original de **Richard E. Pattis** (Universidad de Stanford, 1981). Usado en CS106A de Stanford por décadas.
 - **La Historia Interminable**: Novela de **Michael Ende** (1979), que inspiró la plantilla original del proyecto Infinite Story.
 - **Arte ASCII de medio bloque**: Trabajo original del autor del proyecto, distribuido bajo licencia MIT.
 - **Code in Place 2026**: Este proyecto fue creado como proyecto final para el programa [Code in Place 2026](https://codeinplace.stanford.edu/) de Stanford — un curso de Python online, gratuito y global.

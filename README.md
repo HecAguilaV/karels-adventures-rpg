@@ -140,7 +140,7 @@ rm -rf __pycache__/ && python3 main.py
 
 ## Attribution
 
-- **Karel the Robot**: Original concept by **Richard E. Pattis** (Stanford University, 1981). Used in Stanford CS106A for decades. More at [stanford.edu/class/cs106a/](https://stanford.edu/class/cs106a/).
+- **Karel the Robot**: Original concept by **Richard E. Pattis** (Stanford University, 1981). Used in Stanford CS106A for decades.
 - **The NeverEnding Story**: Novel by **Michael Ende** (1979), which inspired the original Infinite Story assignment template.
 - **Half-block ASCII art**: Original work by the project author, distributed under the MIT license.
 - **Code in Place 2026**: This project was created as the final project for Stanford's [Code in Place 2026](https://codeinplace.stanford.edu/) program — a free, global online Python course.
