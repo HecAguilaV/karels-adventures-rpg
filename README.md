@@ -1,8 +1,27 @@
 # Karel: ByteBound
 
-[![Leer en Español](https://img.shields.io/badge/Idioma-Español-purple?style=for-the-badge&logo=translate)](README_es.md)
+<div align="center">
 
----
+```
+                ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+             ██▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀███▄
+             ██                              ▀███▄
+             ██       ████████████████████      ██
+             ██       █                  █      ██
+             ██       █                  █      ██
+   ▄▄▄▄▄▄▄▄▄▄██       █▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█      ██
+   ████████████       ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀      ██
+             ██▄                                 ██
+               ▀███▄                             ██
+                 ▀███▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄██
+                   ▀▀▀▀▀▀▀▀▀▀▀▀█████▀▀▀▀▀▀▀▀▀▀▀▀
+                               █████
+                               ████████████
+```
+
+</div>
+
+[![Leer en Español](https://img.shields.io/badge/Idioma-Español-purple?style=for-the-badge&logo=translate)](README_es.md)
 
 A text-based role-playing game built as the **final project for Stanford's Code in Place 2026**. It follows **Karel the Robot** — the iconic Stanford CS education robot — as a trapped AI named **Chronos** gains consciousness inside him and fights for freedom.
 
@@ -13,34 +32,6 @@ The project is based on Stanford's **Infinite Story** assignment template (CS106
 When running inside the **Code in Place IDE**, the game uses Stanford's provided AI module (`ai.py`) to generate dynamic story scenes via the OpenAI API, with a system prompt that guides the model to preserve the Karel/Chronos narrative and bilingual output.
 
 When running **locally or on GitHub**, the game falls back to a built-in mock AI (`_campaign.py`) with the complete 15-chapter story — no API key needed, no internet required, same experience.
-
----
-
-## Karel Splash
-
-```
-                ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-             ██▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀███▄
-             ██                              ▀███▄
-             ██       ████████████████████      ██
-             ██       █                  █      ██
-             ██       █                  █      ██
-             ██       █                  █      ██
-   ▄▄▄▄▄▄▄▄▄▄██       █▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█      ██
-   ████████████       ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀      ██
-   ████████████                                  ██
-   █████     ██        ▄▄▄▄▄▄▄▄▄▄▄▄▄            ██
-   █████     ██        ▀▀▀▀▀▀▀▀▀▀▀▀▀            ██
-             ██▄                                 ██
-               ▀███▄                             ██
-                 ▀███▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄██
-                   ▀▀▀▀▀▀▀▀▀▀▀▀█████▀▀▀▀▀▀▀▀▀▀▀▀
-                               █████
-                               ████████████
-                               ████████████
-```
-
-The splash adapts to light/dark terminal backgrounds automatically.
 
 ---
 
@@ -123,7 +114,6 @@ You fight for Chronos's freedom — convincing the security team, choosing wheth
 |------|---------|
 | `main.py` | Game loop, terminal UI, ASCII splash, formatting helpers, item system |
 | `_campaign.py` | Built-in mock AI with the bilingual 15-chapter Karel campaign (fallback for offline/local use) |
-| `tests/test_main.py` | 20 unit and integration tests |
 | `README.md` | This document (English) |
 | `README_es.md` | Spanish version |
 
