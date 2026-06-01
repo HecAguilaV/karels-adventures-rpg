@@ -1,6 +1,8 @@
 # --- Arquitectura y Documentación Interna ---
 local/
 proyectofinal/
+openspec/
+tests/
 
 # --- Extensiones y Configuración de Agentes (Cursor, Antigravity, etc.) ---
 *.gga

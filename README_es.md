@@ -124,9 +124,6 @@ Luchas por la libertad de Chronos — convences al equipo de seguridad, eliges s
 | `main.py` | Bucle del juego, interfaz de terminal, splash ASCII, helpers de formato, sistema de objetos |
 | `_campaign.py` | IA simulada incorporada con la campaña bilingüe de Karel (15 capítulos, fallback local) |
 | `tests/test_main.py` | 20 pruebas unitarias y de integración |
-| `proyectofinal/goalguideline.md` | Directrices del proyecto final de Code in Place 2026 |
-| `proyectofinal/guia_historiainfinita-originial.md` | Consigna original de Infinite Story de Stanford |
-| `proyectofinal/branding.md` | Atribuciones y referencias de marca |
 | `README.md` | Documentación en inglés |
 | `README_es.md` | Este documento (español) |
 

@@ -124,9 +124,6 @@ You fight for Chronos's freedom — convincing the security team, choosing wheth
 | `main.py` | Game loop, terminal UI, ASCII splash, formatting helpers, item system |
 | `_campaign.py` | Built-in mock AI with the bilingual 15-chapter Karel campaign (fallback for offline/local use) |
 | `tests/test_main.py` | 20 unit and integration tests |
-| `proyectofinal/goalguideline.md` | Code in Place 2026 final project guidelines |
-| `proyectofinal/guia_historiainfinita-originial.md` | Original Stanford Infinite Story assignment handout |
-| `proyectofinal/branding.md` | Attribution and branding references |
 | `README.md` | This document (English) |
 | `README_es.md` | Spanish version |
 
