@@ -96,12 +96,16 @@ Items carry real weight in your bid for freedom:
 
 ## Files
 
-| File             | Purpose                                                                     |
-| ---------------- | --------------------------------------------------------------------------- |
-| `main.py`      | Game loop, terminal rendering, ASCII splash, dynamic colors, state tracking |
-| `_campaign.py` | Branching narrative graph data and local story translation engine           |
-| `README.md`    | English documentation                                                       |
-| `README_es.md` | Spanish documentation                                                       |
+| File / Directory                    | Purpose                                                                     |
+| ----------------------------------- | --------------------------------------------------------------------------- |
+| `main.py`                           | Game loop, terminal rendering, ASCII splash, dynamic colors, state tracking |
+| `_campaign.py`                      | Branching narrative graph data (27 scenes, bilingual EN/ES)                 |
+| `tests/test_main.py`               | 24 automated unit tests for core game functions                             |
+| `docs/story_overview.md`           | Campaign flowchart, scene attributes, and dice mechanics (English)          |
+| `docs/story_overview_es.md`        | Campaign flowchart, scene attributes, and dice mechanics (Spanish)          |
+| `docs/branding/`                    | Official key art, design guide, and promotional assets                      |
+| `README.md`                         | English documentation                                                       |
+| `README_es.md`                      | Spanish documentation                                                       |
 
 ---
 

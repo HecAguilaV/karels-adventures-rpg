@@ -96,12 +96,16 @@ Cada objeto tiene peso real en tu intento de escape:
 
 ## Estructura de Archivos
 
-| Archivo | Propósito |
-|---------|-----------|
-| `main.py` | Bucle de juego, renderizado de terminal, splash ASCII, colores dinámicos, control de estado |
-| `_campaign.py` | Grafo de narrativa ramificada y motor de traducción local |
-| `README.md` | Documentación en inglés |
-| `README_es.md` | Documentación en español |
+| Archivo / Directorio                | Propósito                                                                                     |
+| ----------------------------------- | --------------------------------------------------------------------------------------------- |
+| `main.py`                           | Bucle de juego, renderizado de terminal, splash ASCII, colores dinámicos, control de estado    |
+| `_campaign.py`                      | Grafo de narrativa ramificada (27 escenas, bilingüe EN/ES)                                    |
+| `tests/test_main.py`               | 24 pruebas unitarias automatizadas para funciones principales del juego                        |
+| `docs/story_overview.md`           | Diagrama de campaña, atributos de escena y mecánicas de dado (Inglés)                          |
+| `docs/story_overview_es.md`        | Diagrama de campaña, atributos de escena y mecánicas de dado (Español)                         |
+| `docs/branding/`                    | Key art oficial, guía de diseño y assets promocionales                                         |
+| `README.md`                         | Documentación en inglés                                                                        |
+| `README_es.md`                      | Documentación en español                                                                       |
 
 ---
 
