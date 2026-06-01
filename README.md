@@ -155,3 +155,7 @@ rm -rf __pycache__/ && python3 main.py
 ## License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+---
+> **Héctor Aguila**
+> *> Un soñador con poca RAM* 👨🏻‍💻
