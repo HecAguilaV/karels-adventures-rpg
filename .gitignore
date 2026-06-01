@@ -15,5 +15,5 @@ tests/
 Thumbs.db
 
 # ---Caché de Python ---
-__pycche__/
+__pycache__/
 *.pyc
