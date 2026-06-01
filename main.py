@@ -311,6 +311,88 @@ def format_backpack(items, lang):
     return result
 
 
+def draw_status_box(state, lang):
+    # Pre-condition - state is a dictionary with keys 'hp', 'oro', 'mochila', 'turnos', lang is the language code
+    # Post-condition - returns a formatted string containing the unified ASCII stats box
+    
+    # Get the terminal width dynamically
+    terminal_width = shutil.get_terminal_size().columns
+    
+    # Calculate box inner width (max 44, but fits smaller terminals)
+    inner_width = min(44, terminal_width - 2)
+    inner_width = max(32, inner_width)
+    
+    # Title formatting (localized title text)
+    welcome_text = TEXT_INTERFACE[lang]["welcome"].strip()
+    title_text = f"◆  {welcome_text}  ◆"
+    
+    # Localization labels
+    if lang == "es":
+        gold_label = "Oro"
+        turn_label = "Turno"
+        bag_label = "Mochila"
+        empty_label = "(vacia)"
+    else:
+        gold_label = "Gold"
+        turn_label = "Turn"
+        bag_label = "Bag"
+        empty_label = "(empty)"
+        
+    # Box dimensions
+    top_border = "╔" + "═" * inner_width + "╗"
+    bottom_border = "╚" + "═" * inner_width + "╝"
+    
+    # Line 1: Title left-aligned with a left margin of 2 spaces
+    if len(title_text) + 4 <= inner_width:
+        title_content = f"  {title_text}"
+    else:
+        title_content = f"  {welcome_text}"
+    title_line = f"║{title_content.ljust(inner_width)}║"
+    
+    # Line 2: HP Bar (dynamic width depending on inner_width)
+    current_hp = state["hp"]
+    max_hp = 100
+    bar_width = max(10, inner_width - 24)
+    filled = max(0, min(bar_width, int(current_hp / max_hp * bar_width)))
+    empty = bar_width - filled
+    hp_bar_str = "█" * filled + "░" * empty
+    hp_val_str = f"{current_hp}/{max_hp}"
+    
+    hp_content = f"  HP  {hp_bar_str}  {hp_val_str}"
+    hp_line = f"║{hp_content.ljust(inner_width)}║"
+    
+    # Line 3: Gold and Turn
+    gold_val = state["oro"]
+    turn_val = state["turnos"]
+    mid_point = inner_width // 2
+    gold_part = f"  {gold_label}  {gold_val}".ljust(mid_point)
+    turn_part = f"{turn_label}  {turn_val}"
+    stats_content = gold_part + turn_part
+    stats_line = f"║{stats_content.ljust(inner_width)}║"
+    
+    # Line 4+: Bag contents
+    bag_lines = []
+    if not state["mochila"]:
+        bag_content = f"  {bag_label}   {empty_label}"
+        bag_lines.append(f"║{bag_content.ljust(inner_width)}║")
+    else:
+        items_str = ", ".join(state["mochila"])
+        bag_prefix = f"  {bag_label}   "
+        prefix_len = len(bag_prefix)
+        wrap_width = inner_width - prefix_len
+        wrapped = textwrap.wrap(items_str, width=wrap_width)
+        for idx, line in enumerate(wrapped):
+            if idx == 0:
+                bag_lines.append(f"║{bag_prefix}{line.ljust(wrap_width)}║")
+            else:
+                indent = " " * prefix_len
+                bag_lines.append(f"║{indent}{line.ljust(wrap_width)}║")
+                
+    # Combine everything
+    box = [top_border, title_line, hp_line, stats_line] + bag_lines + [bottom_border]
+    return "\n".join(box)
+
+
 def process_response(response, lang):
     # Pre-condition - response is a string containing a JSON response, lang is the language code
     # Post-condition - returns a safely decoded Python dictionary
@@ -423,11 +505,11 @@ KAREL_ART = [
     '             ██       █                  █      ██',
     '   ▄▄▄▄▄▄▄▄▄▄██       █▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█      ██',
     '   ████████████       ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀      ██',
-    '   ████████████                                  ██',
+    '   ████████████                                 ██',
     '   █████     ██        ▄▄▄▄▄▄▄▄▄▄▄▄▄            ██',
     '   █████     ██        ▀▀▀▀▀▀▀▀▀▀▀▀▀            ██',
-    '             ██▄                                 ██',
-    '               ▀███▄                             ██',
+    '             ██▄                                ██',
+    '               ▀███▄                            ██',
     '                 ▀███▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄██',
     '                   ▀▀▀▀▀▀▀▀▀▀▀▀█████▀▀▀▀▀▀▀▀▀▀▀▀',
     '                               █████',
@@ -544,7 +626,9 @@ def main():
             lang = "es"
             break
         else:
-            print("\033[91mInvalid input. Seleccion invalida.\033[0m")
+            print()
+            print("\033[91m[ERROR DE PROTOCOLO / PROTOCOL ERROR] Boot sequence interrupted. Select 1 or 2. / Secuencia de inicio interrumpida. Selecciona 1 o 2.\033[0m")
+            print()
             
     # Load story files based on selected language
     story_data, nombre_historia = select_story_file(lang)
@@ -618,25 +702,61 @@ def main():
     clear_screen()
     print(karel_splash(lang))
     
+    pending_hp_change = None
+    pending_item_found = None
+    pending_item_flavor = None
+    pending_backpack_full = False
+    pending_invalid_option = False
+    first_turn = True
+
     # Main game loop keeping session alive while player HP is positive
     while state["hp"] > 0:
-        # Display current player status bar with HP bar
+        if not first_turn:
+            clear_screen()
+        else:
+            first_turn = False
+
+        # Display current player status box
         print()
-        print(COLOR_STATUS + TEXT_INTERFACE[lang]["status_bar"].format(
-            hp_bar=hp_bar(state["hp"], 100, 20),
-            gold=state["oro"],
-            turn=state["turnos"]
-        ) + COLOR_RESET)
-        
-        # Display formatted backpack grid below the status bar
-        backpack_display = format_backpack(state["mochila"], lang)
-        # Print each line of the backpack grid with color
-        for bp_line in backpack_display.split("\n"):
-            print(COLOR_STATUS + bp_line + COLOR_RESET)
+        status_box = draw_status_box(state, lang)
+        for box_line in status_box.split("\n"):
+            print(COLOR_STATUS + box_line + COLOR_RESET)
+            
+        # Display pending dice roll and alerts from the previous turn transition
+        if pending_item_flavor:
+            print()
+            print(COLOR_STATUS + wrap(pending_item_flavor) + COLOR_RESET)
+            pending_item_flavor = None
+            
+        if pending_hp_change is not None:
+            if pending_hp_change < 0:
+                print()
+                print(COLOR_DAMAGE + wrap(TEXT_INTERFACE[lang]["damage_alert"].format(damage=abs(pending_hp_change))) + COLOR_RESET)
+            elif pending_hp_change > 0:
+                print()
+                print(COLOR_NARRATIVE + wrap(TEXT_INTERFACE[lang]["heal_alert"].format(heal=pending_hp_change)) + COLOR_RESET)
+            pending_hp_change = None
+            
+        if pending_backpack_full:
+            print()
+            print(COLOR_STATUS + wrap(TEXT_INTERFACE[lang]["backpack_full"]) + COLOR_RESET)
+            pending_backpack_full = False
+            
+        if pending_item_found is not None:
+            print()
+            print(COLOR_STATUS + wrap(TEXT_INTERFACE[lang]["loot_alert"].format(item=pending_item_found)) + COLOR_RESET)
+            pending_item_found = None
+            
+        if pending_invalid_option:
+            print()
+            print(COLOR_DAMAGE + wrap(TEXT_INTERFACE[lang]["invalid_option"]) + COLOR_RESET)
+            pending_invalid_option = False
         
         # Display current narrative text with typewriter effect
         print()
-        typewrite(COLOR_NARRATIVE + narrativa_actual + COLOR_RESET)
+        print(COLOR_NARRATIVE, end="", flush=True)
+        typewrite(narrativa_actual)
+        print(COLOR_RESET, end="", flush=True)
         
         # Append current narrative to messages history
         messages.append({"role": "assistant", "content": narrativa_actual})
@@ -665,6 +785,7 @@ def main():
             
         # Validate user input to exit
         if entrada.lower() in ["salir", "exit"]:
+            print(karel_splash(lang))
             print(COLOR_NARRATIVE + TEXT_INTERFACE[lang]["thanks"] + COLOR_RESET)
             print(COLOR_CREDITS + TEXT_INTERFACE[lang]["credits"] + COLOR_RESET)
             break
@@ -679,24 +800,22 @@ def main():
         
         if 0 <= seleccion < num_story_options:
             opcion_elegida = opciones_actuales[seleccion]
-        elif num_backpack_items > 0 and seleccion < num_story_options + num_backpack_items:
+        elif num_backpack_items > 0 and num_story_options <= seleccion < num_story_options + num_backpack_items:
             # Use a backpack item — does NOT consume a turn
             item_idx = seleccion - num_story_options
             item_name = state["mochila"].pop(item_idx)
             heal_amt, gold_amt, flavor_en, flavor_es = get_item_effect(item_name)
             state["hp"] = min(100, state["hp"] + heal_amt)
             state["oro"] += gold_amt
-            print()
-            print(COLOR_STATUS + wrap(flavor_es if lang == "es" else flavor_en) + COLOR_RESET)
+            pending_item_flavor = flavor_es if lang == "es" else flavor_en
             continue
         else:
-            print(COLOR_DAMAGE + TEXT_INTERFACE[lang]["invalid_option"] + COLOR_RESET)
+            pending_invalid_option = True
             messages.pop()
             continue
         
         # Roll d20 dice
         dado = roll_d20()
-        print(COLOR_STATUS + "\n" + TEXT_INTERFACE[lang]["dice_roll"].format(roll=dado) + COLOR_RESET)
         
         # Inject dice, choice, and backpack context into user prompt
         if lang == "es":
@@ -731,24 +850,17 @@ def main():
         state["hp"] += cambio
         if state["hp"] > 100:
             state["hp"] = 100
-            
-        if cambio < 0:
-            print()
-            print(COLOR_DAMAGE + wrap(TEXT_INTERFACE[lang]["damage_alert"].format(damage=abs(cambio))) + COLOR_RESET)
-        elif cambio > 0:
-            print()
-            print(COLOR_NARRATIVE + wrap(TEXT_INTERFACE[lang]["heal_alert"].format(heal=cambio)) + COLOR_RESET)
+        pending_hp_change = cambio
 
         item = respuesta.get("item_encontrado")
         if item and item.lower() != "null" and item.lower() != "none":
             # Cap backpack at 10 items to keep status bar readable
             if len(state["mochila"]) >= 10:
                 state["mochila"].pop(0)
-                print(COLOR_STATUS + wrap(TEXT_INTERFACE[lang]["backpack_full"]) + COLOR_RESET)
+                pending_backpack_full = True
             state["mochila"].append(item)
             state["oro"] += 5
-            print()
-            print(COLOR_STATUS + wrap(TEXT_INTERFACE[lang]["loot_alert"].format(item=item)) + COLOR_RESET)
+            pending_item_found = item
             
         state["turnos"] += 1
         
@@ -775,6 +887,8 @@ def main():
         print()
         print(divider("═", COLOR_DAMAGE))
         print(COLOR_CREDITS + TEXT_INTERFACE[lang]["credits"] + COLOR_RESET)
+
+    print()
 
 if __name__ == "__main__":
     main()
