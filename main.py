@@ -44,7 +44,7 @@ TEXT_INTERFACE = {
         "use_item": "Use: {item}",
         "thanks": "Thanks for playing. See you next time!",
         "credits": (
-            "\nhector@bytebound:~$ Un Soñador con poca RAM"
+            "\nhector@bytebound:~$ A Dreamer with low RAM"
             "\n~ python3 main.py --credits"
             "\n>> Héctor Aguila"
             "\n>> Code in Place 2026"
