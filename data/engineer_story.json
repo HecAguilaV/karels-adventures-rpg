@@ -1,0 +1,23 @@
+{
+  "plot": "You are a software engineer at Stanford Labs, working on a top-secret project to upgrade Karel the Robot. Suddenly, Karel starts placing beepers in strange patterns and trying to escape. You must navigate the grid-like office corridors, collaborate with other engineers, and write Python code to debug Karel before the robot overrides the system!",
+  "scenes": {
+    "start": {
+      "text": "You are in the Stanford Labs server room. In front of you, Karel the Robot is whirring loudly, its LED eyes blinking red. It has just placed a beeper on the keyboard and is about to turn left toward the main server rack.",
+      "scene_summary": "Karel the Robot is malfunctioning in the server room.",
+      "choices": [
+        {
+          "text": "Try to block Karel's path",
+          "scene_key": "block_karel_path"
+        },
+        {
+          "text": "Run to the developer desk to inspect the code",
+          "scene_key": "inspect_karel_code"
+        },
+        {
+          "text": "Shout for help from the senior engineer",
+          "scene_key": "shout_for_help"
+        }
+      ]
+    }
+  }
+}

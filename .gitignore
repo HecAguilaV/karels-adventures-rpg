@@ -1,0 +1,16 @@
+# --- Arquitectura y Documentación Interna ---
+local/
+
+# --- Extensiones y Configuración de Agentes (Cursor, Antigravity, etc.) ---
+*.gga
+.openspec/
+.cursor/
+.atl/
+
+# --- Archivos del Sistema Operativo ---
+.DS_Store
+Thumbs.db
+
+# ---Caché de Python ---
+__pycche__/
+*.pyc
