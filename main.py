@@ -17,6 +17,7 @@ COLOR_NARRATIVE = "\033[94m"
 COLOR_DAMAGE = "\033[91m"
 COLOR_STATUS = "\033[93m"
 COLOR_MENU = "\033[95m"
+COLOR_CREDITS = "\033[92m"
 COLOR_RESET = "\033[0m"
 
 # Translation matrix for local i18n interface
@@ -42,6 +43,12 @@ TEXT_INTERFACE = {
         "backpack_full": "[BACKPACK] Full! Oldest item discarded.",
         "use_item": "Use: {item}",
         "thanks": "Thanks for playing. See you next time!",
+        "credits": (
+            "\nhector@bytebound:~$ Un Soñador con poca RAM"
+            "\n~ python3 main.py --credits"
+            "\n>> Héctor Aguila"
+            "\n>> Code in Place 2026"
+        ),
         "selecting_story": "=== SELECT YOUR STORY ===",
         "story_prompt": "Select the story number: ",
         "invalid_story": "Invalid selection. Try again.",
@@ -70,6 +77,12 @@ TEXT_INTERFACE = {
         "backpack_full": "[MOCHILA] ¡Llena! Se descarto el objeto mas antiguo.",
         "use_item": "Usar: {item}",
         "thanks": "Gracias por jugar. ¡Hasta la proxima!",
+        "credits": (
+            "\nhector@bytebound:~$ Un Soñador con poca RAM"
+            "\n~ python3 main.py --credits"
+            "\n>> Héctor Aguila"
+            "\n>> Code in Place 2026"
+        ),
         "selecting_story": "=== SELECCIONA TU HISTORIA ===",
         "story_prompt": "Selecciona el numero de la historia: ",
         "invalid_story": "Seleccion invalida. Intenta de nuevo.",
@@ -653,6 +666,7 @@ def main():
         # Validate user input to exit
         if entrada.lower() in ["salir", "exit"]:
             print(COLOR_NARRATIVE + TEXT_INTERFACE[lang]["thanks"] + COLOR_RESET)
+            print(COLOR_CREDITS + TEXT_INTERFACE[lang]["credits"] + COLOR_RESET)
             break
             
         # Validate numeric option selection
@@ -748,6 +762,7 @@ def main():
             print()
             print(divider())
             print(COLOR_NARRATIVE + TEXT_INTERFACE[lang]["thanks"] + COLOR_RESET)
+            print(COLOR_CREDITS + TEXT_INTERFACE[lang]["credits"] + COLOR_RESET)
             break
         
     # End of game state
@@ -759,6 +774,7 @@ def main():
         print(COLOR_DAMAGE + wrap(TEXT_INTERFACE[lang]["game_over_desc"]) + COLOR_RESET)
         print()
         print(divider("═", COLOR_DAMAGE))
+        print(COLOR_CREDITS + TEXT_INTERFACE[lang]["credits"] + COLOR_RESET)
 
 if __name__ == "__main__":
     main()
